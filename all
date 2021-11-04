@@ -1,0 +1,229 @@
+其中包含了
+
+config.php：連線資料庫的基本檔案
+index.php：預設的首頁(登入頁面)
+login.php：處理登入
+logout.php：處理登出
+register.php：處理註冊
+register.html：註冊頁面
+welcome.php：登入成功後出現的頁面(裡面包含一個登出的連結)
+連線資料庫
+
+config.php是與資料庫有關的設定檔
+
+
+<?php
+/* Database credentials. Assuming you are running MySQL
+server with default setting (user 'root' with no password) */
+/*define() 函數定義一個常量。
+在設定以後，常量的值無法更改
+常量名不需要開頭的美元符號 ($)
+作用域不影響對常量的訪問
+常量值只能是字符串或數字*/
+define('DB_SERVER', 'localhost');
+define('DB_USERNAME', 'root');
+define('DB_PASSWORD', '');
+define('DB_NAME', 'test');
+ 
+/* Attempt to connect to MySQL database */
+$link = mysqli_connect(DB_SERVER, DB_USERNAME, DB_PASSWORD, DB_NAME);
+// 輸入中文也OK的編碼
+mysqli_query($link, 'SET NAMES utf8');
+
+// Check connection
+if($link === false){
+    die("ERROR: Could not connect. " . mysqli_connect_error());
+}
+else{
+    return $link;
+}
+?>
+index.php(登入頁面)與register.html
+
+index.php的程式碼中包含了SESSION的確認、登入的表單
+
+
+<?php
+// Initialize the session
+session_start();
+ 
+// Check if the user is already logged in, if yes then redirect him to welcome page
+if(isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true){
+    header("location: welcome.php");
+    exit;  //記得要跳出來，不然會重複轉址過多次
+}
+?>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>登入介面</title>
+</head>
+<body>
+    <h1>Log In</h1>
+    <h2>你可以選擇登入或是註冊帳號~</h2>
+<form method="post" action="login.php">
+帳號：
+<input type="text" name="username"><br/><br/>
+密碼：
+<input type="password" name="password"><br><br>
+<input type="submit" value="登入" name="submit"><br><br>
+<a href="register.html">還沒有帳號？現在就註冊！</a>
+</form>
+</body>
+</html>
+
+register.html包含了簡單的檢核機制、註冊的表單(也可以把register.html&register.php寫在一起)
+
+
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>會員註冊</title>
+    <script>
+        
+        function validateForm() {
+            var x = document.forms["registerForm"]["password"].value;
+            var y = document.forms["registerForm"]["password_check"].value;
+            if(x.length<6){
+                alert("密碼長度不足");
+                return false;
+            }
+            if (x != y) {
+                alert("請確認密碼是否輸入正確");
+                return false;
+            }
+        }
+    </script>
+    
+    </head>
+<body>
+    <h1>註冊頁面</h1>
+<form name="registerForm" method="post" action="register.php" onsubmit="return validateForm()">
+帳  號：
+    <input type="text" name="username"><br/><br/>
+密  碼：
+<input type="password" name="password" id="password"><br/><br/>
+確認密碼：
+    <input type="password" name="password_check" id="password_check"><br/><br/>
+<input type="submit" value="註冊" name="submit">
+<input type="reset" value="重設" name="submit">
+</form>
+
+
+</body>
+</html>
+login.php與logout.php
+
+login.php負責處理登入的動作
+
+
+<?php
+// Include config file
+$conn=require_once "config.php";
+ 
+// Define variables and initialize with empty values
+$username=$_POST["username"];
+$password=$_POST["password"];
+//增加hash可以提高安全性
+$password_hash=password_hash($password,PASSWORD_DEFAULT);
+// Processing form data when form is submitted
+if($_SERVER["REQUEST_METHOD"] == "POST"){
+    $sql = "SELECT * FROM users WHERE username ='".$username."'";
+    $result=mysqli_query($conn,$sql);
+    if(mysqli_num_rows($result)==1 && $password==mysqli_fetch_assoc($result)["password"]){
+        session_start();
+        // Store data in session variables
+        $_SESSION["loggedin"] = true;
+        //這些是之後可以用到的變數
+        $_SESSION["id"] = mysqli_fetch_assoc($result)["id"];
+        $_SESSION["username"] = mysqli_fetch_assoc($result)["username"];
+        header("location:welcome.php");
+    }else{
+            function_alert("帳號或密碼錯誤"); 
+        }
+}
+    else{
+        function_alert("Something wrong"); 
+    }
+
+    // Close connection
+    mysqli_close($link);
+
+function function_alert($message) { 
+      
+    // Display the alert box  
+    echo "<script>alert('$message');
+     window.location.href='index.php';
+    </script>"; 
+    return false;
+} 
+?>
+?>
+logout.php(必要！瀏覽器會記錄登入過的使用者，除非你去清除cookie)
+
+
+<?php 
+session_start(); 
+$_SESSION = array(); 
+session_destroy(); 
+header('location:index.php'); 
+
+?>
+register.php
+
+<?php 
+$conn=require_once("config.php");
+
+if($_SERVER["REQUEST_METHOD"]=="POST"){
+    $username=$_POST["username"];
+    $password=$_POST["password"];
+    //檢查帳號是否重複
+    $check="SELECT * FROM user WHERE username='".$username."'";
+    if(mysqli_num_rows(mysqli_query($conn,$check))==0){
+        $sql="INSERT INTO user (id,username, password)
+            VALUES(NULL,'".$username."','".$password."')";
+        
+        if(mysqli_query($conn, $sql)){
+            echo "註冊成功!3秒後將自動跳轉頁面<br>";
+            echo "<a href='index.php'>未成功跳轉頁面請點擊此</a>";
+            header("refresh:32;url=index.php");
+            exit;
+        }else{
+            echo "Error creating table: " . mysqli_error($conn);
+        }
+    }
+    else{
+        echo "該帳號已有人使用!<br>3秒後將自動跳轉頁面<br>";
+        echo "<a href='register.html'>未成功跳轉頁面請點擊此</a>";
+        header('HTTP/1.0 302 Found');
+        //header("refresh:3;url=register.html",true);
+        exit;
+    }
+}
+
+
+mysqli_close($conn);
+
+function function_alert($message) { 
+      
+    // Display the alert box  
+    echo "<script>alert('$message');
+     window.location.href='index.php';
+    </script>"; 
+    
+    return false;
+} 
+?>
+welcome.php
+
+最後則是welcome.php，為使用者成功登入後看到的畫面
+之後可以透過$_SESSION控制不同身分使用者看到不同畫面
+
+
+<?php
+session_start();  //很重要，可以用的變數存在session裡
+$username=$_SESSION["username"];
+echo "<h1>你好 ".$username."</h1>";
+echo "<a href='logout.php'>登出</a>";
+    
+?>
